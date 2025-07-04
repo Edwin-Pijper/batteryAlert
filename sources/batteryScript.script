@@ -1,0 +1,69 @@
+#! /usr/bin/osascript
+---------------------------------------------------------------------
+-- Dit script geeft een geluidsmelding als er nog 30 minuten batterijstroom over is
+-- Tevens geeft het een popup
+-- Author: Edwin Pijper
+-- e-mail: e.pijper@belastingdienst.nl
+---------------------------------------------------------------------
+
+---------------------------------------------------------------------
+-- Variabelen
+---------------------------------------------------------------------
+set thresholdTime to "0:40"
+set thresholdPercentage to 10
+set currentVolume to (output volume of (get volume settings))
+set iconFile to "/usr/local/batteryAlert/low_battery.icns"
+
+---------------------------------------------------------------------
+-- main 
+---------------------------------------------------------------------
+set theBattString to (do shell script "pmset -g batt")
+-- the above will return something like...
+-- Now drawing from 'Battery Power' -InternalBattery-0  82%; discharging; 4:06 remaining
+-- Now drawing from 'AC Power' -InternalBattery-0 (id=21037155)	40%; AC attached; not charging present: true
+
+set batteryLevel to splitText(theBattString, space)
+set remainingTime to item 9 of batteryLevel
+set drawing to item 4 of batteryLevel
+set cmd to "/usr/bin/pmset -g batt | grep -Eo '\\d+%' | sed 's/%//'"
+set remainingLevel to (do shell script cmd) as number
+
+-- check accu status op basis van tijd of percentage
+set alert to false
+if remainingTime = "(no" then
+	if remainingLevel < thresholdPercentage then
+		set alert to true
+		set messageText to "Accu bijna leeg! (" & remainingLevel & "%)
+
+Je MacBook zal binnenkort uitvallen!"
+	end if
+else
+	if remainingTime < thresholdTime then
+		set alert to true
+		set messageText to "Accu bijna leeg! (" & remainingLevel & "%)
+
+Je MacBook zal na ongeveer " & remainingTime & " uur uitvallen!"
+	end if
+end if
+
+if drawing = "'Battery" and alert = true then
+	set volume output volume 80
+	beep 2
+	do shell script "say  \"Sluit je MacBook aan op de netstroom\" "
+	set volume output volume currentVolume
+	display dialog messageText with icon POSIX file iconFile buttons "OK"
+end if
+
+on splitText(theText, theDelimiter)
+	set AppleScript's text item delimiters to theDelimiter
+	set theTextItems to every text item of theText
+	set AppleScript's text item delimiters to ""
+	return theTextItems
+end splitText
+
+on getPositionOfItemInList(theItem, theList)
+	repeat with a from 1 to count of theList
+		if item a of theList is theItem then return a
+	end repeat
+	return 0
+end getPositionOfItemInList
